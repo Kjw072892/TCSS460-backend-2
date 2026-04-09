@@ -12,6 +12,7 @@ export default [
       parserOptions: {
         ecmaVersion: 2022,
         sourceType: 'module',
+        project: './tsconfig.eslint.json',
       },
       globals: {
         console: 'readonly',
@@ -37,6 +38,7 @@ export default [
       eqeqeq: ['error', 'always'],
       'prefer-const': 'error',
       'no-console': 'warn',
+      '@typescript-eslint/no-floating-promises': 'error',
     },
   },
   {
@@ -46,6 +48,7 @@ export default [
       parserOptions: {
         ecmaVersion: 2022,
         sourceType: 'module',
+        project: './tsconfig.eslint.json',
       },
       globals: {
         console: 'readonly',
@@ -74,6 +77,7 @@ export default [
       eqeqeq: ['error', 'always'],
       'prefer-const': 'error',
       'no-console': 'warn',
+      '@typescript-eslint/no-floating-promises': 'error',
     },
   },
   {
