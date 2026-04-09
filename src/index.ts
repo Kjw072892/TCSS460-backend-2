@@ -3,7 +3,9 @@ import { app } from '@/app';
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT);
+
+server.on('listening', () => {
   // eslint-disable-next-line no-console
   console.log(`Server running at http://localhost:${PORT}`);
   // eslint-disable-next-line no-console
