@@ -1,0 +1,642 @@
+openapi: 3.0.3
+info:
+  title: TCSS 460 Backend 2 — Messaging API
+  description: |
+    Express + TypeScript + PostgreSQL example API for TCSS 460.
+
+    - **v1** routes use raw SQL queries with the `pg` driver.
+    - **v2** routes use Prisma ORM for the same operations.
+
+    Both versions implement the same API contract — same endpoints, same
+    request/response shapes. The difference is the data access layer.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3000
+    description: Local development
+
+tags:
+  - name: Users (v1)
+    description: User operations — raw SQL
+  - name: Users (v2)
+    description: User operations — Prisma ORM
+  - name: Messages (v1)
+    description: Message CRUD — raw SQL
+  - name: Messages (v2)
+    description: Message CRUD — Prisma ORM
+
+paths:
+  # ── v1 Users ──────────────────────────────────────────────────
+
+  /v1/users:
+    get:
+      tags: [Users (v1)]
+      summary: List users (paginated)
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: Paginated list of users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUsers'
+    post:
+      tags: [Users (v1)]
+      summary: Create a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          description: Username or email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /v1/users/{id}:
+    get:
+      tags: [Users (v1)]
+      summary: Get user by ID (with messages)
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: User with their messages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserWithMessagesResponse'
+        '400':
+          $ref: '#/components/responses/InvalidId'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── v1 Messages ───────────────────────────────────────────────
+
+  /v1/messages:
+    get:
+      tags: [Messages (v1)]
+      summary: List messages (paginated, filterable)
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/limit'
+        - name: authorId
+          in: query
+          schema:
+            type: integer
+          description: Filter by author ID
+      responses:
+        '200':
+          description: Paginated list of messages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMessages'
+    post:
+      tags: [Messages (v1)]
+      summary: Create a message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMessageRequest'
+      responses:
+        '201':
+          description: Message created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /v1/messages/{id}:
+    get:
+      tags: [Messages (v1)]
+      summary: Get message by ID
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Message with author info
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          $ref: '#/components/responses/InvalidId'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Messages (v1)]
+      summary: Full update a message
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMessageRequest'
+      responses:
+        '200':
+          description: Message updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Messages (v1)]
+      summary: Partial update a message
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchMessageRequest'
+      responses:
+        '200':
+          description: Message updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Messages (v1)]
+      summary: Delete a message
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Message deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: Message deleted successfully
+        '400':
+          $ref: '#/components/responses/InvalidId'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── v2 Users ──────────────────────────────────────────────────
+
+  /v2/users:
+    get:
+      tags: [Users (v2)]
+      summary: List users (paginated)
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: Paginated list of users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUsers'
+    post:
+      tags: [Users (v2)]
+      summary: Create a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          description: Username or email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /v2/users/{id}:
+    get:
+      tags: [Users (v2)]
+      summary: Get user by ID (with messages)
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: User with their messages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserWithMessagesResponse'
+        '400':
+          $ref: '#/components/responses/InvalidId'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── v2 Messages ───────────────────────────────────────────────
+
+  /v2/messages:
+    get:
+      tags: [Messages (v2)]
+      summary: List messages (paginated, filterable, sortable)
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/limit'
+        - name: authorId
+          in: query
+          schema:
+            type: integer
+          description: Filter by author ID
+        - name: read
+          in: query
+          schema:
+            type: string
+            enum: ['true', 'false']
+          description: Filter by read status
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [id, content, createdAt, read]
+            default: id
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+          description: Sort order
+      responses:
+        '200':
+          description: Paginated list of messages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMessages'
+    post:
+      tags: [Messages (v2)]
+      summary: Create a message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMessageRequest'
+      responses:
+        '201':
+          description: Message created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /v2/messages/{id}:
+    get:
+      tags: [Messages (v2)]
+      summary: Get message by ID
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Message with author info
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          $ref: '#/components/responses/InvalidId'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Messages (v2)]
+      summary: Full update a message
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMessageRequest'
+      responses:
+        '200':
+          description: Message updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Messages (v2)]
+      summary: Partial update a message
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchMessageRequest'
+      responses:
+        '200':
+          description: Message updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Messages (v2)]
+      summary: Delete a message
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Message deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: Message deleted successfully
+        '400':
+          $ref: '#/components/responses/InvalidId'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  parameters:
+    id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+      description: Resource ID
+    page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Page number
+    limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 25
+      description: Items per page (max 100)
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Something went wrong
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 25
+        total:
+          type: integer
+          example: 500
+        totalPages:
+          type: integer
+          example: 20
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        username:
+          type: string
+          example: jchen
+        email:
+          type: string
+          example: jchen@example.com
+        firstName:
+          type: string
+          example: Jessica
+        lastName:
+          type: string
+          example: Chen
+        active:
+          type: boolean
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        content:
+          type: string
+          example: Hey, are we still meeting at 3pm today?
+        subject:
+          type: string
+          nullable: true
+          example: Quick question
+        read:
+          type: boolean
+          example: false
+        authorId:
+          type: integer
+          example: 1
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateUserRequest:
+      type: object
+      required: [username, email, firstName, lastName]
+      properties:
+        username:
+          type: string
+          example: newuser
+        email:
+          type: string
+          example: newuser@example.com
+        firstName:
+          type: string
+          example: New
+        lastName:
+          type: string
+          example: User
+
+    CreateMessageRequest:
+      type: object
+      required: [content, authorId]
+      properties:
+        content:
+          type: string
+          example: Hey, are we still meeting at 3pm today?
+        subject:
+          type: string
+          nullable: true
+          example: Quick question
+        authorId:
+          type: integer
+          example: 1
+
+    PatchMessageRequest:
+      type: object
+      properties:
+        content:
+          type: string
+          example: Updated message content
+        subject:
+          type: string
+          nullable: true
+          example: Updated subject
+        read:
+          type: boolean
+          example: true
+
+    UserResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/User'
+
+    UserWithMessagesResponse:
+      type: object
+      properties:
+        data:
+          allOf:
+            - $ref: '#/components/schemas/User'
+            - type: object
+              properties:
+                messages:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Message'
+
+    MessageResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Message'
+
+    PaginatedUsers:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    PaginatedMessages:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Message'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+  responses:
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Validation failed
+              details:
+                type: array
+                items:
+                  type: string
+
+    InvalidId:
+      description: ID must be a positive integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

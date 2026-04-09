@@ -1,0 +1,35 @@
+generator client {
+    provider = "prisma-client"
+    output   = "../src/generated/prisma"
+}
+
+datasource db {
+    provider = "postgresql"
+}
+
+model User {
+    id        Int       @id @default(autoincrement())
+    username  String    @unique
+    email     String    @unique
+    firstName String    @map("first_name")
+    lastName  String    @map("last_name")
+    active    Boolean   @default(true)
+    createdAt DateTime  @default(now()) @map("created_at")
+    updatedAt DateTime  @updatedAt @map("updated_at")
+    messages  Message[]
+
+    @@map("users")
+}
+
+model Message {
+    id        Int      @id @default(autoincrement())
+    content   String
+    subject   String?
+    read      Boolean  @default(false)
+    authorId  Int      @map("author_id")
+    author    User     @relation(fields: [authorId], references: [id])
+    createdAt DateTime @default(now()) @map("created_at")
+    updatedAt DateTime @updatedAt @map("updated_at")
+
+    @@map("messages")
+}
