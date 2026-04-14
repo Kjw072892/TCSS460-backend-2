@@ -1,97 +1,76 @@
-import { Request, Response, NextFunction } from 'express';
+import { RequestHandler } from 'express';
+import { z } from 'zod';
 
 /**
- * Validates that :id route parameter is a positive integer.
+ * Request validation middleware.
+ *
+ * Schemas act as a single source of truth: they validate at runtime and
+ * produce TypeScript types via z.infer, so the runtime check and compile-time
+ * type cannot drift apart. See validation.legacy.ts for the hand-rolled
+ * equivalent kept for comparison.
  */
-export const validateNumericId = (request: Request, response: Response, next: NextFunction) => {
-  const id = Number(request.params.id);
 
-  if (!Number.isInteger(id) || id < 1) {
-    response.status(400).json({ error: 'id must be a positive integer' });
-    return;
-  }
+// --- Schemas ---
 
-  next();
-};
+const IdParamSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
+
+const MessageBodySchema = z.object({
+  content: z.string().trim().min(1),
+  authorId: z.number().int().positive(),
+});
+
+const PatchMessageBodySchema = z
+  .object({
+    content: z.string().trim().min(1).optional(),
+    subject: z.string().optional(),
+    read: z.boolean().optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, {
+    message: 'At least one field is required (content, subject, read)',
+  });
+
+const UserBodySchema = z.object({
+  username: z.string().trim().min(1),
+  email: z.string().trim().min(1),
+  firstName: z.string().trim().min(1),
+  lastName: z.string().trim().min(1),
+});
 
 /**
- * Validates required fields for creating/updating a message (POST/PUT).
- * Requires: content (string), authorId (positive integer).
+ * Generic middleware factory. Parses `request[source]` against `schema`;
+ * on failure responds 400 with issue details, on success replaces the
+ * source with the parsed (and coerced) value so downstream handlers get
+ * properly typed data.
  */
-export const validateMessageBody = (request: Request, response: Response, next: NextFunction) => {
-  const errors: string[] = [];
-
-  if (typeof request.body.content !== 'string' || request.body.content.trim().length === 0) {
-    errors.push('content is required and must be a non-empty string');
-  }
-
-  if (!Number.isInteger(request.body.authorId) || request.body.authorId < 1) {
-    errors.push('authorId is required and must be a positive integer');
-  }
-
-  if (errors.length > 0) {
-    response.status(400).json({ error: 'Validation failed', details: errors });
-    return;
-  }
-
-  next();
-};
-
-/**
- * Validates that a PATCH request has at least one valid field to update.
- * Valid fields: content, subject, read.
- */
-export const validatePatchMessageBody = (
-  request: Request,
-  response: Response,
-  next: NextFunction
-) => {
-  const validFields = ['content', 'subject', 'read'];
-  const providedFields = Object.keys(request.body).filter((key) => validFields.includes(key));
-
-  if (providedFields.length === 0) {
-    response.status(400).json({
-      error: 'At least one field is required',
-      details: `Valid fields: ${validFields.join(', ')}`,
-    });
-    return;
-  }
-
-  if (request.body.content !== undefined) {
-    if (typeof request.body.content !== 'string' || request.body.content.trim().length === 0) {
-      response.status(400).json({ error: 'content must be a non-empty string' });
+const validate =
+  (source: 'body' | 'params', schema: z.ZodType): RequestHandler =>
+  (request, response, next) => {
+    const result = schema.safeParse(request[source]);
+    if (!result.success) {
+      response.status(400).json({
+        error: 'Validation failed',
+        details: result.error.issues.map((i) => ({
+          path: i.path.join('.'),
+          message: i.message,
+        })),
+      });
       return;
     }
-  }
+    request[source] = result.data;
+    next();
+  };
 
-  if (request.body.read !== undefined) {
-    if (typeof request.body.read !== 'boolean') {
-      response.status(400).json({ error: 'read must be a boolean' });
-      return;
-    }
-  }
+// --- Middleware ---
 
-  next();
-};
+export const validateNumericId = validate('params', IdParamSchema);
+export const validateMessageBody = validate('body', MessageBodySchema);
+export const validatePatchMessageBody = validate('body', PatchMessageBodySchema);
+export const validateUserBody = validate('body', UserBodySchema);
 
-/**
- * Validates required fields for creating a user (POST).
- * Requires: username, email, firstName, lastName.
- */
-export const validateUserBody = (request: Request, response: Response, next: NextFunction) => {
-  const requiredFields = ['username', 'email', 'firstName', 'lastName'];
-  const errors: string[] = [];
+// --- Types inferred from schemas (no hand-written interfaces needed) ---
 
-  for (const field of requiredFields) {
-    if (typeof request.body[field] !== 'string' || request.body[field].trim().length === 0) {
-      errors.push(`${field} is required and must be a non-empty string`);
-    }
-  }
-
-  if (errors.length > 0) {
-    response.status(400).json({ error: 'Validation failed', details: errors });
-    return;
-  }
-
-  next();
-};
+export type MessageBody = z.infer<typeof MessageBodySchema>;
+export type PatchMessageBody = z.infer<typeof PatchMessageBodySchema>;
+export type UserBody = z.infer<typeof UserBodySchema>;
