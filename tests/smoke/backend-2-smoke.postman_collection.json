@@ -1,0 +1,738 @@
+{
+  "info": {
+    "_postman_id": "be2-smoke-2026-04-17",
+    "name": "TCSS 460 Backend 2 — Smoke Tests",
+    "description": "End-to-end smoke tests for backend-2 covering dev-login, public GETs, authed writes, ownership, and admin override. Run top-to-bottom — later requests depend on tokens and message IDs set by earlier ones.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "0 — Setup (login)",
+      "item": [
+        {
+          "name": "dev-login as user (alice)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('returns token', () => pm.expect(body.token).to.be.a('string'));",
+                  "pm.environment.set('userToken', body.token);",
+                  "const payload = JSON.parse(atob(body.token.split('.')[1]));",
+                  "pm.environment.set('userSub', String(payload.sub));",
+                  "pm.test('role is user', () => pm.expect(payload.role).to.eql('user'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{userUsername}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/dev-login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "dev-login"]
+            }
+          }
+        },
+        {
+          "name": "dev-login as other user (mallory)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.environment.set('otherToken', pm.response.json().token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{otherUsername}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/dev-login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "dev-login"]
+            }
+          }
+        },
+        {
+          "name": "dev-login as admin (seeded)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.environment.set('adminToken', body.token);",
+                  "const payload = JSON.parse(atob(body.token.split('.')[1]));",
+                  "pm.test('role is admin (seeded)', () => pm.expect(payload.role).to.eql('admin'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{adminUsername}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/dev-login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "dev-login"]
+            }
+          }
+        },
+        {
+          "name": "dev-login missing username → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('400 validation', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": {
+              "raw": "{{baseUrl}}/auth/dev-login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "dev-login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1 — Public GETs",
+      "item": [
+        {
+          "name": "GET /v2/messages (public, paginated)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('has data array', () => pm.expect(body.data).to.be.an('array'));",
+                  "pm.test('has pagination', () => pm.expect(body.pagination).to.have.keys(['page','limit','total','totalPages']));",
+                  "if (body.data.length > 0) pm.environment.set('anyMsgId', String(body.data[0].id));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v2/messages?limit=5",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "messages"],
+              "query": [{ "key": "limit", "value": "5" }]
+            }
+          }
+        },
+        {
+          "name": "GET /v1/messages (public, paginated)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('has data array', () => pm.expect(pm.response.json().data).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/messages?limit=5",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "messages"],
+              "query": [{ "key": "limit", "value": "5" }]
+            }
+          }
+        },
+        {
+          "name": "GET /v2/messages/:id — single (public, id captured from list)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const msg = pm.response.json().data;",
+                  "pm.test('returns the requested id', () => pm.expect(String(msg.id)).to.eql(pm.environment.get('anyMsgId')));",
+                  "pm.test('includes author', () => pm.expect(msg.authorUsername || (msg.author && msg.author.username)).to.be.a('string'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v2/messages/{{anyMsgId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "messages", "{{anyMsgId}}"]
+            }
+          }
+        },
+        {
+          "name": "GET /v2/messages/0 → 400 (invalid id)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v2/messages/0",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "messages", "0"]
+            }
+          }
+        },
+        {
+          "name": "GET /v2/messages/999999999 → 404 (not found)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('404', () => pm.response.to.have.status(404));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v2/messages/999999999",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "messages", "999999999"]
+            }
+          }
+        },
+        {
+          "name": "GET /v2/messages/abc → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v2/messages/abc",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "messages", "abc"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 — Messages v2 (Prisma)",
+      "item": [
+        {
+          "name": "POST /v2/messages — no token → 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('401', () => pm.response.to.have.status(401));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"should be rejected\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v2/messages",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "messages"]
+            }
+          }
+        },
+        {
+          "name": "POST /v2/messages — bad token → 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('401', () => pm.response.to.have.status(401));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer not-a-real-token" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"should be rejected\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v2/messages",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "messages"]
+            }
+          }
+        },
+        {
+          "name": "POST /v2/messages — authed → 201",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('authorId is the JWT sub', () => pm.expect(String(body.data.authorId)).to.eql(pm.environment.get('userSub')));",
+                  "pm.environment.set('v2MsgId', String(body.data.id));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{userToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"smoke test v2 message\",\n  \"subject\": \"smoke\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v2/messages",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "messages"]
+            }
+          }
+        },
+        {
+          "name": "POST /v2/messages — authed, missing content → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{userToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": {
+              "raw": "{{baseUrl}}/v2/messages",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "messages"]
+            }
+          }
+        },
+        {
+          "name": "PATCH /v2/messages/:id — owner → 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('read flipped', () => pm.expect(pm.response.json().data.read).to.eql(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{userToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"read\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v2/messages/{{v2MsgId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "messages", "{{v2MsgId}}"]
+            }
+          }
+        },
+        {
+          "name": "PATCH /v2/messages/:id — non-owner → 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('403', () => pm.response.to.have.status(403));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{otherToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"hijack attempt\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v2/messages/{{v2MsgId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "messages", "{{v2MsgId}}"]
+            }
+          }
+        },
+        {
+          "name": "DELETE /v2/messages/:id — non-owner → 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('403', () => pm.response.to.have.status(403));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{otherToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/v2/messages/{{v2MsgId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "messages", "{{v2MsgId}}"]
+            }
+          }
+        },
+        {
+          "name": "DELETE /v2/messages/:id — admin override → 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/v2/messages/{{v2MsgId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "messages", "{{v2MsgId}}"]
+            }
+          }
+        },
+        {
+          "name": "DELETE /v2/messages/:id — already gone → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('404', () => pm.response.to.have.status(404));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/v2/messages/{{v2MsgId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "messages", "{{v2MsgId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 — Messages v1 (raw SQL)",
+      "item": [
+        {
+          "name": "POST /v1/messages — no token → 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('401', () => pm.response.to.have.status(401));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"content\": \"x\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/v1/messages",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "messages"]
+            }
+          }
+        },
+        {
+          "name": "POST /v1/messages — authed → 201",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('authorId is the JWT sub', () => pm.expect(String(body.data.authorId)).to.eql(pm.environment.get('userSub')));",
+                  "pm.environment.set('v1MsgId', String(body.data.id));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{userToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"smoke test v1 message\",\n  \"subject\": \"smoke\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/messages",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "messages"]
+            }
+          }
+        },
+        {
+          "name": "PUT /v1/messages/:id — owner → 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('content updated', () => pm.expect(pm.response.json().data.content).to.eql('updated by owner'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{userToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"updated by owner\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/messages/{{v1MsgId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "messages", "{{v1MsgId}}"]
+            }
+          }
+        },
+        {
+          "name": "PUT /v1/messages/:id — non-owner → 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('403', () => pm.response.to.have.status(403));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{otherToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"hijack\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/messages/{{v1MsgId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "messages", "{{v1MsgId}}"]
+            }
+          }
+        },
+        {
+          "name": "DELETE /v1/messages/:id — non-owner → 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('403', () => pm.response.to.have.status(403));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{otherToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/v1/messages/{{v1MsgId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "messages", "{{v1MsgId}}"]
+            }
+          }
+        },
+        {
+          "name": "DELETE /v1/messages/:id — admin override → 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/v1/messages/{{v1MsgId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "messages", "{{v1MsgId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 — Users (smoke only, not auth-gated)",
+      "item": [
+        {
+          "name": "GET /v2/users (public)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v2/users?limit=5",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "users"],
+              "query": [{ "key": "limit", "value": "5" }]
+            }
+          }
+        },
+        {
+          "name": "POST /v1/users (creates a brand-new user)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('_suffix', Date.now().toString(36));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 or 409 (conflict OK on repeat run)', () => pm.expect([201, 409]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"smoke-user-{{_suffix}}\",\n  \"email\": \"smoke-{{_suffix}}@example.test\",\n  \"firstName\": \"Smoke\",\n  \"lastName\": \"Test\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "users"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

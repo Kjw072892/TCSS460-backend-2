@@ -16,6 +16,8 @@ servers:
     description: Local development
 
 tags:
+  - name: Auth
+    description: Development-only authentication (JWT minting). Replaced by a real identity provider in Sprint 3.
   - name: Users (v1)
     description: User operations — raw SQL
   - name: Users (v2)
@@ -26,6 +28,44 @@ tags:
     description: Message CRUD — Prisma ORM
 
 paths:
+  # ── Auth (dev-only) ───────────────────────────────────────────
+
+  /auth/dev-login:
+    post:
+      tags: [Auth]
+      summary: Dev-only login — mint a JWT for a given username
+      description: |
+        TEMPORARY endpoint. Find-or-creates a user with `role: "user"` and
+        returns a signed JWT. Does NOT validate a password. Local-development
+        stand-in for a real identity provider. Do not deploy to a public URL.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username]
+              properties:
+                username:
+                  type: string
+                  example: alice
+                email:
+                  type: string
+                  example: alice@example.test
+      responses:
+        '200':
+          description: Token issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: "Signed JWT — send as `Authorization: Bearer <token>`"
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
   # ── v1 Users ──────────────────────────────────────────────────
 
   /v1/users:
@@ -109,6 +149,8 @@ paths:
     post:
       tags: [Messages (v1)]
       summary: Create a message
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -124,6 +166,8 @@ paths:
                 $ref: '#/components/schemas/MessageResponse'
         '400':
           $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /v1/messages/{id}:
     get:
@@ -144,7 +188,9 @@ paths:
           $ref: '#/components/responses/NotFound'
     put:
       tags: [Messages (v1)]
-      summary: Full update a message
+      summary: Full update a message (owner only)
+      security:
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/id'
       requestBody:
@@ -162,11 +208,17 @@ paths:
                 $ref: '#/components/schemas/MessageResponse'
         '400':
           $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
     patch:
       tags: [Messages (v1)]
-      summary: Partial update a message
+      summary: Partial update a message (owner only)
+      security:
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/id'
       requestBody:
@@ -184,11 +236,17 @@ paths:
                 $ref: '#/components/schemas/MessageResponse'
         '400':
           $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
     delete:
       tags: [Messages (v1)]
-      summary: Delete a message
+      summary: Delete a message (owner or admin)
+      security:
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/id'
       responses:
@@ -207,6 +265,10 @@ paths:
                         example: Message deleted successfully
         '400':
           $ref: '#/components/responses/InvalidId'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -313,6 +375,8 @@ paths:
     post:
       tags: [Messages (v2)]
       summary: Create a message
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -328,6 +392,8 @@ paths:
                 $ref: '#/components/schemas/MessageResponse'
         '400':
           $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /v2/messages/{id}:
     get:
@@ -348,7 +414,9 @@ paths:
           $ref: '#/components/responses/NotFound'
     put:
       tags: [Messages (v2)]
-      summary: Full update a message
+      summary: Full update a message (owner only)
+      security:
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/id'
       requestBody:
@@ -366,11 +434,17 @@ paths:
                 $ref: '#/components/schemas/MessageResponse'
         '400':
           $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
     patch:
       tags: [Messages (v2)]
-      summary: Partial update a message
+      summary: Partial update a message (owner only)
+      security:
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/id'
       requestBody:
@@ -388,11 +462,17 @@ paths:
                 $ref: '#/components/schemas/MessageResponse'
         '400':
           $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
     delete:
       tags: [Messages (v2)]
-      summary: Delete a message
+      summary: Delete a message (owner or admin)
+      security:
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/id'
       responses:
@@ -411,6 +491,10 @@ paths:
                         example: Message deleted successfully
         '400':
           $ref: '#/components/responses/InvalidId'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -484,6 +568,9 @@ components:
         lastName:
           type: string
           example: Chen
+        role:
+          type: string
+          example: user
         active:
           type: boolean
           example: true
@@ -539,7 +626,7 @@ components:
 
     CreateMessageRequest:
       type: object
-      required: [content, authorId]
+      required: [content]
       properties:
         content:
           type: string
@@ -548,9 +635,6 @@ components:
           type: string
           nullable: true
           example: Quick question
-        authorId:
-          type: integer
-          example: 1
 
     PatchMessageRequest:
       type: object
@@ -640,3 +724,24 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+
+    Unauthorized:
+      description: Missing, malformed, or invalid token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Forbidden:
+      description: Authenticated but not allowed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT issued by `/auth/dev-login` (Sprint 2 demo).

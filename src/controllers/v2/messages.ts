@@ -67,7 +67,8 @@ export const getMessageById = async (request: Request, response: Response) => {
 };
 
 export const createMessage = async (request: Request, response: Response) => {
-  const { content, subject, authorId } = request.body;
+  const { content, subject } = request.body;
+  const authorId = request.user!.sub;
 
   try {
     const message = await prisma.message.create({
@@ -89,27 +90,31 @@ export const createMessage = async (request: Request, response: Response) => {
 
 export const updateMessage = async (request: Request, response: Response) => {
   const id = Number(request.params.id);
-  const { content, subject, authorId } = request.body;
+  const { content, subject } = request.body;
+  const authorId = request.user!.sub;
 
   try {
+    const existing = await prisma.message.findUnique({
+      where: { id },
+      select: { authorId: true },
+    });
+    if (!existing) {
+      response.status(404).json({ error: 'Message not found' });
+      return;
+    }
+    if (existing.authorId !== authorId) {
+      response.status(403).json({ error: 'You can only update your own messages' });
+      return;
+    }
+
     const message = await prisma.message.update({
       where: { id },
-      data: { content, subject: subject || null, authorId },
+      data: { content, subject: subject || null },
       include: { author: { select: { id: true, username: true } } },
     });
 
     response.json({ data: message });
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2025') {
-        response.status(404).json({ error: 'Message not found' });
-        return;
-      }
-      if (error.code === 'P2003') {
-        response.status(400).json({ error: 'Author not found' });
-        return;
-      }
-    }
+  } catch (_error) {
     response.status(500).json({ error: 'Failed to update message' });
   }
 };
@@ -117,13 +122,27 @@ export const updateMessage = async (request: Request, response: Response) => {
 export const patchMessage = async (request: Request, response: Response) => {
   const id = Number(request.params.id);
   const { content, subject, read } = request.body;
-
-  const data: Record<string, unknown> = {};
-  if (content !== undefined) data.content = content;
-  if (subject !== undefined) data.subject = subject;
-  if (read !== undefined) data.read = read;
+  const authorId = request.user!.sub;
 
   try {
+    const existing = await prisma.message.findUnique({
+      where: { id },
+      select: { authorId: true },
+    });
+    if (!existing) {
+      response.status(404).json({ error: 'Message not found' });
+      return;
+    }
+    if (existing.authorId !== authorId) {
+      response.status(403).json({ error: 'You can only update your own messages' });
+      return;
+    }
+
+    const data: Record<string, unknown> = {};
+    if (content !== undefined) data.content = content;
+    if (subject !== undefined) data.subject = subject;
+    if (read !== undefined) data.read = read;
+
     const message = await prisma.message.update({
       where: { id },
       data,
@@ -131,31 +150,33 @@ export const patchMessage = async (request: Request, response: Response) => {
     });
 
     response.json({ data: message });
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2025') {
-        response.status(404).json({ error: 'Message not found' });
-        return;
-      }
-    }
+  } catch (_error) {
     response.status(500).json({ error: 'Failed to update message' });
   }
 };
 
 export const deleteMessage = async (request: Request, response: Response) => {
   const id = Number(request.params.id);
+  const { sub: authorId, role } = request.user!;
 
   try {
+    const existing = await prisma.message.findUnique({
+      where: { id },
+      select: { authorId: true },
+    });
+    if (!existing) {
+      response.status(404).json({ error: 'Message not found' });
+      return;
+    }
+    if (role !== 'admin' && existing.authorId !== authorId) {
+      response.status(403).json({ error: 'You can only delete your own messages' });
+      return;
+    }
+
     await prisma.message.delete({ where: { id } });
 
     response.json({ data: { message: 'Message deleted successfully' } });
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2025') {
-        response.status(404).json({ error: 'Message not found' });
-        return;
-      }
-    }
+  } catch (_error) {
     response.status(500).json({ error: 'Failed to delete message' });
   }
 };

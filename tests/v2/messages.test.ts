@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { app } from '../../src/app';
 import { prisma } from '../../src/prisma';
+import { authHeader } from '../helpers';
 
 jest.mock('../../src/prisma', () => ({
   prisma: {
@@ -23,13 +24,17 @@ jest.mock('../../src/prisma', () => ({
 
 const mockMessage = prisma.message as jest.Mocked<typeof prisma.message>;
 
+const asUser = authHeader({ sub: 1, role: 'user' });
+const asOtherUser = authHeader({ sub: 2, role: 'user' });
+const asAdmin = authHeader({ sub: 99, role: 'admin' });
+
 beforeEach(() => {
   jest.clearAllMocks();
 });
 
 describe('v2 Messages Routes', () => {
   describe('GET /v2/messages', () => {
-    it('returns paginated messages with defaults', async () => {
+    it('returns paginated messages with defaults (public)', async () => {
       (mockMessage.findMany as jest.Mock).mockResolvedValueOnce([
         { id: 1, content: 'Hello', author: { id: 1, username: 'jchen' } },
       ]);
@@ -52,7 +57,7 @@ describe('v2 Messages Routes', () => {
       (mockMessage.count as jest.Mock).mockResolvedValueOnce(50);
 
       const response = await request(app).get(
-        '/v2/messages?page=2&limit=10&sort=createdAt&order=desc'
+        '/v2/messages?page=2&limit=10&sort=createdAt&order=desc',
       );
 
       expect(response.status).toBe(200);
@@ -69,7 +74,7 @@ describe('v2 Messages Routes', () => {
       expect(mockMessage.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({ authorId: 5 }),
-        })
+        }),
       );
     });
 
@@ -85,7 +90,7 @@ describe('v2 Messages Routes', () => {
   });
 
   describe('GET /v2/messages/:id', () => {
-    it('returns a message by id', async () => {
+    it('returns a message by id (public)', async () => {
       (mockMessage.findUnique as jest.Mock).mockResolvedValueOnce({
         id: 1,
         content: 'Hello',
@@ -114,44 +119,44 @@ describe('v2 Messages Routes', () => {
   });
 
   describe('POST /v2/messages', () => {
-    it('creates a message and returns 201', async () => {
+    it('creates a message for the authenticated user', async () => {
       (mockMessage.create as jest.Mock).mockResolvedValueOnce({
         id: 1,
         content: 'New message',
+        authorId: 1,
         author: { id: 1, username: 'jchen' },
       });
 
       const response = await request(app)
         .post('/v2/messages')
-        .send({ content: 'New message', authorId: 1 });
+        .set(asUser)
+        .send({ content: 'New message' });
 
       expect(response.status).toBe(201);
+      // authorId comes from JWT sub, never from the request body
+      expect(mockMessage.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ authorId: 1 }),
+        }),
+      );
+    });
+
+    it('returns 401 without a token', async () => {
+      const response = await request(app).post('/v2/messages').send({ content: 'Hello' });
+
+      expect(response.status).toBe(401);
     });
 
     it('returns 400 for missing content', async () => {
-      const response = await request(app).post('/v2/messages').send({ authorId: 1 });
-
-      expect(response.status).toBe(400);
-    });
-
-    it('returns 400 for non-existent author (P2003)', async () => {
-      const { Prisma } = jest.requireActual('../../src/generated/prisma/client');
-      const error = new Prisma.PrismaClientKnownRequestError('FK violation', {
-        code: 'P2003',
-        clientVersion: '7.0.0',
-      });
-      (mockMessage.create as jest.Mock).mockRejectedValueOnce(error);
-
-      const response = await request(app)
-        .post('/v2/messages')
-        .send({ content: 'Hello', authorId: 999 });
+      const response = await request(app).post('/v2/messages').set(asUser).send({});
 
       expect(response.status).toBe(400);
     });
   });
 
   describe('PUT /v2/messages/:id', () => {
-    it('updates a message', async () => {
+    it('owner can update', async () => {
+      (mockMessage.findUnique as jest.Mock).mockResolvedValueOnce({ authorId: 1 });
       (mockMessage.update as jest.Mock).mockResolvedValueOnce({
         id: 1,
         content: 'Updated',
@@ -160,29 +165,44 @@ describe('v2 Messages Routes', () => {
 
       const response = await request(app)
         .put('/v2/messages/1')
-        .send({ content: 'Updated', authorId: 1 });
+        .set(asUser)
+        .send({ content: 'Updated' });
 
       expect(response.status).toBe(200);
     });
 
-    it('returns 404 for non-existent message (P2025)', async () => {
-      const { Prisma } = jest.requireActual('../../src/generated/prisma/client');
-      const error = new Prisma.PrismaClientKnownRequestError('Not found', {
-        code: 'P2025',
-        clientVersion: '7.0.0',
-      });
-      (mockMessage.update as jest.Mock).mockRejectedValueOnce(error);
+    it('non-owner gets 403', async () => {
+      (mockMessage.findUnique as jest.Mock).mockResolvedValueOnce({ authorId: 1 });
+
+      const response = await request(app)
+        .put('/v2/messages/1')
+        .set(asOtherUser)
+        .send({ content: 'Updated' });
+
+      expect(response.status).toBe(403);
+    });
+
+    it('returns 404 for non-existent message', async () => {
+      (mockMessage.findUnique as jest.Mock).mockResolvedValueOnce(null);
 
       const response = await request(app)
         .put('/v2/messages/999')
-        .send({ content: 'Updated', authorId: 1 });
+        .set(asUser)
+        .send({ content: 'Updated' });
 
       expect(response.status).toBe(404);
+    });
+
+    it('returns 401 without a token', async () => {
+      const response = await request(app).put('/v2/messages/1').send({ content: 'Updated' });
+
+      expect(response.status).toBe(401);
     });
   });
 
   describe('PATCH /v2/messages/:id', () => {
-    it('partially updates a message', async () => {
+    it('owner can partially update', async () => {
+      (mockMessage.findUnique as jest.Mock).mockResolvedValueOnce({ authorId: 1 });
       (mockMessage.update as jest.Mock).mockResolvedValueOnce({
         id: 1,
         content: 'Hello',
@@ -190,38 +210,74 @@ describe('v2 Messages Routes', () => {
         author: { id: 1, username: 'jchen' },
       });
 
-      const response = await request(app).patch('/v2/messages/1').send({ read: true });
+      const response = await request(app)
+        .patch('/v2/messages/1')
+        .set(asUser)
+        .send({ read: true });
 
       expect(response.status).toBe(200);
     });
 
+    it('non-owner gets 403', async () => {
+      (mockMessage.findUnique as jest.Mock).mockResolvedValueOnce({ authorId: 1 });
+
+      const response = await request(app)
+        .patch('/v2/messages/1')
+        .set(asOtherUser)
+        .send({ read: true });
+
+      expect(response.status).toBe(403);
+    });
+
     it('returns 400 when no valid fields provided', async () => {
-      const response = await request(app).patch('/v2/messages/1').send({ invalid: 'field' });
+      const response = await request(app)
+        .patch('/v2/messages/1')
+        .set(asUser)
+        .send({ invalid: 'field' });
 
       expect(response.status).toBe(400);
     });
   });
 
   describe('DELETE /v2/messages/:id', () => {
-    it('deletes a message', async () => {
+    it('owner can delete own message', async () => {
+      (mockMessage.findUnique as jest.Mock).mockResolvedValueOnce({ authorId: 1 });
       (mockMessage.delete as jest.Mock).mockResolvedValueOnce({ id: 1 });
 
-      const response = await request(app).delete('/v2/messages/1');
+      const response = await request(app).delete('/v2/messages/1').set(asUser);
 
       expect(response.status).toBe(200);
     });
 
-    it('returns 404 for non-existent message (P2025)', async () => {
-      const { Prisma } = jest.requireActual('../../src/generated/prisma/client');
-      const error = new Prisma.PrismaClientKnownRequestError('Not found', {
-        code: 'P2025',
-        clientVersion: '7.0.0',
-      });
-      (mockMessage.delete as jest.Mock).mockRejectedValueOnce(error);
+    it('non-owner non-admin gets 403', async () => {
+      (mockMessage.findUnique as jest.Mock).mockResolvedValueOnce({ authorId: 1 });
 
-      const response = await request(app).delete('/v2/messages/999');
+      const response = await request(app).delete('/v2/messages/1').set(asOtherUser);
+
+      expect(response.status).toBe(403);
+    });
+
+    it('admin can delete any message', async () => {
+      (mockMessage.findUnique as jest.Mock).mockResolvedValueOnce({ authorId: 1 });
+      (mockMessage.delete as jest.Mock).mockResolvedValueOnce({ id: 1 });
+
+      const response = await request(app).delete('/v2/messages/1').set(asAdmin);
+
+      expect(response.status).toBe(200);
+    });
+
+    it('returns 404 for non-existent message', async () => {
+      (mockMessage.findUnique as jest.Mock).mockResolvedValueOnce(null);
+
+      const response = await request(app).delete('/v2/messages/999').set(asUser);
 
       expect(response.status).toBe(404);
+    });
+
+    it('returns 401 without a token', async () => {
+      const response = await request(app).delete('/v2/messages/1');
+
+      expect(response.status).toBe(401);
     });
   });
 });

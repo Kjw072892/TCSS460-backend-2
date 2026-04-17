@@ -70,6 +70,15 @@ The server runs at **http://localhost:3000** with API docs at **http://localhost
 
 ## API Endpoints
 
+### Auth (dev-only)
+
+| Method | Route              | Description                                               |
+| ------ | ------------------ | --------------------------------------------------------- |
+| POST   | `/auth/dev-login`  | Find-or-create a user by username and return a signed JWT |
+
+`/auth/dev-login` is a local-development stand-in for a real identity provider.
+It does **not** validate a password. Do not deploy this endpoint.
+
 ### Users
 
 | Method | Route               | Description                  |
@@ -80,14 +89,18 @@ The server runs at **http://localhost:3000** with API docs at **http://localhost
 
 ### Messages
 
-| Method | Route                  | Description                           |
-| ------ | ---------------------- | ------------------------------------- |
-| GET    | `/v{1,2}/messages`     | List messages (paginated, filterable) |
-| GET    | `/v{1,2}/messages/:id` | Get a message with author             |
-| POST   | `/v{1,2}/messages`     | Create a message                      |
-| PUT    | `/v{1,2}/messages/:id` | Full update a message                 |
-| PATCH  | `/v{1,2}/messages/:id` | Partial update a message              |
-| DELETE | `/v{1,2}/messages/:id` | Delete a message                      |
+| Method | Route                  | Description                                          | Auth       |
+| ------ | ---------------------- | ---------------------------------------------------- | ---------- |
+| GET    | `/v{1,2}/messages`     | List messages (paginated, filterable)                | public     |
+| GET    | `/v{1,2}/messages/:id` | Get a message with author                            | public     |
+| POST   | `/v{1,2}/messages`     | Create a message (author = `sub` from JWT)           | bearer     |
+| PUT    | `/v{1,2}/messages/:id` | Full update a message                                | owner only |
+| PATCH  | `/v{1,2}/messages/:id` | Partial update a message                             | owner only |
+| DELETE | `/v{1,2}/messages/:id` | Delete a message                                     | owner or admin |
+
+Protected endpoints expect `Authorization: Bearer <token>`. Grab a token from
+`POST /auth/dev-login` with `{ "username": "alice" }`. The seed script creates
+an `admin` user — log in as `admin` to exercise the admin delete path.
 
 ### Pagination
 
@@ -116,9 +129,10 @@ src/
 │   └── v2/               # Prisma implementations
 ├── middleware/
 │   ├── logger.ts         # Request logging
-│   ├── validation.ts     # Input validation
-│   └── jwt.ts            # JWT middleware (prepared for Week 5)
+│   ├── validation.ts     # Input validation (Zod)
+│   └── requireAuth.ts    # JWT verify + role gate; augments Express.Request.user
 └── routes/
+    ├── devAuth.ts        # POST /auth/dev-login — dev-only JWT mint
     ├── v1/               # v1 route definitions
     └── v2/               # v2 route definitions
 ```

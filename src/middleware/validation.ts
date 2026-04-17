@@ -18,7 +18,7 @@ const IdParamSchema = z.object({
 
 const MessageBodySchema = z.object({
   content: z.string().trim().min(1),
-  authorId: z.number().int().positive(),
+  subject: z.string().optional(),
 });
 
 const PatchMessageBodySchema = z
