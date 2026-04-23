@@ -25,7 +25,7 @@ messagesRouter.patch(
   requireAuth,
   validateNumericId,
   validatePatchMessageBody,
-  patchMessage,
+  patchMessage
 );
 messagesRouter.delete('/:id', requireAuth, validateNumericId, deleteMessage);
 

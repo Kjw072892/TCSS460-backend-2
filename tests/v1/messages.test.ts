@@ -187,10 +187,7 @@ describe('v1 Messages Routes', () => {
           rows: [{ id: 1, content: 'Hello', subject: null, read: true, authorId: 1 }],
         });
 
-      const response = await request(app)
-        .patch('/v1/messages/1')
-        .set(asUser)
-        .send({ read: true });
+      const response = await request(app).patch('/v1/messages/1').set(asUser).send({ read: true });
 
       expect(response.status).toBe(200);
     });

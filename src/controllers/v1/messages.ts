@@ -107,7 +107,7 @@ export const updateMessage = async (request: Request, response: Response) => {
   try {
     const existing = await pool.query(
       `SELECT author_id AS "authorId" FROM messages WHERE id = $1`,
-      [id],
+      [id]
     );
     if (existing.rowCount === 0) {
       response.status(404).json({ error: 'Message not found' });
@@ -140,7 +140,7 @@ export const patchMessage = async (request: Request, response: Response) => {
   try {
     const existing = await pool.query(
       `SELECT author_id AS "authorId" FROM messages WHERE id = $1`,
-      [id],
+      [id]
     );
     if (existing.rowCount === 0) {
       response.status(404).json({ error: 'Message not found' });
@@ -188,7 +188,7 @@ export const deleteMessage = async (request: Request, response: Response) => {
   try {
     const existing = await pool.query(
       `SELECT author_id AS "authorId" FROM messages WHERE id = $1`,
-      [id],
+      [id]
     );
     if (existing.rowCount === 0) {
       response.status(404).json({ error: 'Message not found' });

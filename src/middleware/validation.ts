@@ -38,6 +38,10 @@ const UserBodySchema = z.object({
   lastName: z.string().trim().min(1),
 });
 
+const SayingBodySchema = z.object({
+  content: z.string().trim().min(1),
+});
+
 /**
  * Generic middleware factory. Parses `request[source]` against `schema`;
  * on failure responds 400 with issue details, on success replaces the
@@ -68,9 +72,11 @@ export const validateNumericId = validate('params', IdParamSchema);
 export const validateMessageBody = validate('body', MessageBodySchema);
 export const validatePatchMessageBody = validate('body', PatchMessageBodySchema);
 export const validateUserBody = validate('body', UserBodySchema);
+export const validateSayingBody = validate('body', SayingBodySchema);
 
 // --- Types inferred from schemas (no hand-written interfaces needed) ---
 
 export type MessageBody = z.infer<typeof MessageBodySchema>;
 export type PatchMessageBody = z.infer<typeof PatchMessageBodySchema>;
 export type UserBody = z.infer<typeof UserBodySchema>;
+export type SayingBody = z.infer<typeof SayingBodySchema>;

@@ -62,7 +62,7 @@ paths:
                 properties:
                   token:
                     type: string
-                    description: "Signed JWT — send as `Authorization: Bearer <token>`"
+                    description: 'Signed JWT — send as `Authorization: Bearer <token>`'
         '400':
           $ref: '#/components/responses/ValidationError'
 

@@ -7,7 +7,13 @@ const adapter = new PrismaPg({ connectionString });
 const prisma = new PrismaClient({ adapter });
 
 const USERS = [
-  { username: 'admin', email: 'admin@example.com', firstName: 'Admin', lastName: 'User', role: 'admin' },
+  {
+    username: 'admin',
+    email: 'admin@example.com',
+    firstName: 'Admin',
+    lastName: 'User',
+    role: 'admin',
+  },
   { username: 'jchen', email: 'jchen@example.com', firstName: 'Jessica', lastName: 'Chen' },
   {
     username: 'mwilliams',

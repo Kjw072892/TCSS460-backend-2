@@ -72,9 +72,9 @@ The server runs at **http://localhost:3000** with API docs at **http://localhost
 
 ### Auth (dev-only)
 
-| Method | Route              | Description                                               |
-| ------ | ------------------ | --------------------------------------------------------- |
-| POST   | `/auth/dev-login`  | Find-or-create a user by username and return a signed JWT |
+| Method | Route             | Description                                               |
+| ------ | ----------------- | --------------------------------------------------------- |
+| POST   | `/auth/dev-login` | Find-or-create a user by username and return a signed JWT |
 
 `/auth/dev-login` is a local-development stand-in for a real identity provider.
 It does **not** validate a password. Do not deploy this endpoint.
@@ -89,14 +89,14 @@ It does **not** validate a password. Do not deploy this endpoint.
 
 ### Messages
 
-| Method | Route                  | Description                                          | Auth       |
-| ------ | ---------------------- | ---------------------------------------------------- | ---------- |
-| GET    | `/v{1,2}/messages`     | List messages (paginated, filterable)                | public     |
-| GET    | `/v{1,2}/messages/:id` | Get a message with author                            | public     |
-| POST   | `/v{1,2}/messages`     | Create a message (author = `sub` from JWT)           | bearer     |
-| PUT    | `/v{1,2}/messages/:id` | Full update a message                                | owner only |
-| PATCH  | `/v{1,2}/messages/:id` | Partial update a message                             | owner only |
-| DELETE | `/v{1,2}/messages/:id` | Delete a message                                     | owner or admin |
+| Method | Route                  | Description                                | Auth           |
+| ------ | ---------------------- | ------------------------------------------ | -------------- |
+| GET    | `/v{1,2}/messages`     | List messages (paginated, filterable)      | public         |
+| GET    | `/v{1,2}/messages/:id` | Get a message with author                  | public         |
+| POST   | `/v{1,2}/messages`     | Create a message (author = `sub` from JWT) | bearer         |
+| PUT    | `/v{1,2}/messages/:id` | Full update a message                      | owner only     |
+| PATCH  | `/v{1,2}/messages/:id` | Partial update a message                   | owner only     |
+| DELETE | `/v{1,2}/messages/:id` | Delete a message                           | owner or admin |
 
 Protected endpoints expect `Authorization: Bearer <token>`. Grab a token from
 `POST /auth/dev-login` with `{ "username": "alice" }`. The seed script creates

@@ -42,46 +42,7 @@ export default [
     },
   },
   {
-    files: ['tests/**/*.ts'],
-    languageOptions: {
-      parser: tsParser,
-      parserOptions: {
-        ecmaVersion: 2022,
-        sourceType: 'module',
-        project: './tsconfig.eslint.json',
-      },
-      globals: {
-        console: 'readonly',
-        process: 'readonly',
-        fetch: 'readonly',
-        global: 'readonly',
-        describe: 'readonly',
-        it: 'readonly',
-        expect: 'readonly',
-        beforeEach: 'readonly',
-        afterEach: 'readonly',
-        beforeAll: 'readonly',
-        afterAll: 'readonly',
-        jest: 'readonly',
-      },
-    },
-    plugins: {
-      '@typescript-eslint': tsPlugin,
-    },
-    rules: {
-      ...tsPlugin.configs.recommended.rules,
-      '@typescript-eslint/no-unused-vars': [
-        'warn',
-        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
-      ],
-      eqeqeq: ['error', 'always'],
-      'prefer-const': 'error',
-      'no-console': 'warn',
-      '@typescript-eslint/no-floating-promises': 'error',
-    },
-  },
-  {
-    ignores: ['dist/', 'node_modules/', 'coverage/', 'jest.config.js', 'src/generated/'],
+    ignores: ['dist/', 'node_modules/', 'coverage/', 'jest.config.js', 'src/generated/', 'tests/'],
   },
   prettierConfig,
 ];

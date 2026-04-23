@@ -15,7 +15,7 @@ export const mintToken = (claims: { sub: number; email?: string; role?: string }
       role: claims.role ?? 'user',
     },
     secret,
-    { expiresIn: '1h' },
+    { expiresIn: '1h' }
   );
 };
 

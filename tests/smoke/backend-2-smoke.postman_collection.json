@@ -703,9 +703,7 @@
               "listen": "prerequest",
               "script": {
                 "type": "text/javascript",
-                "exec": [
-                  "pm.variables.set('_suffix', Date.now().toString(36));"
-                ]
+                "exec": ["pm.variables.set('_suffix', Date.now().toString(36));"]
               }
             },
             {

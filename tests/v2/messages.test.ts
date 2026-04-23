@@ -1,3 +1,4 @@
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import request from 'supertest';
 import { app } from '../../src/app';
 import { prisma } from '../../src/prisma';
@@ -22,7 +23,7 @@ jest.mock('../../src/prisma', () => ({
   },
 }));
 
-const mockMessage = prisma.message as jest.Mocked<typeof prisma.message>;
+const mockMessage = prisma.message as any;
 
 const asUser = authHeader({ sub: 1, role: 'user' });
 const asOtherUser = authHeader({ sub: 2, role: 'user' });
@@ -35,10 +36,10 @@ beforeEach(() => {
 describe('v2 Messages Routes', () => {
   describe('GET /v2/messages', () => {
     it('returns paginated messages with defaults (public)', async () => {
-      (mockMessage.findMany as jest.Mock).mockResolvedValueOnce([
+      mockMessage.findMany.mockResolvedValueOnce([
         { id: 1, content: 'Hello', author: { id: 1, username: 'jchen' } },
       ]);
-      (mockMessage.count as jest.Mock).mockResolvedValueOnce(1);
+      mockMessage.count.mockResolvedValueOnce(1);
 
       const response = await request(app).get('/v2/messages');
 
@@ -53,11 +54,11 @@ describe('v2 Messages Routes', () => {
     });
 
     it('respects page, limit, sort, and order params', async () => {
-      (mockMessage.findMany as jest.Mock).mockResolvedValueOnce([]);
-      (mockMessage.count as jest.Mock).mockResolvedValueOnce(50);
+      mockMessage.findMany.mockResolvedValueOnce([]);
+      mockMessage.count.mockResolvedValueOnce(50);
 
       const response = await request(app).get(
-        '/v2/messages?page=2&limit=10&sort=createdAt&order=desc',
+        '/v2/messages?page=2&limit=10&sort=createdAt&order=desc'
       );
 
       expect(response.status).toBe(200);
@@ -66,21 +67,21 @@ describe('v2 Messages Routes', () => {
     });
 
     it('filters by authorId', async () => {
-      (mockMessage.findMany as jest.Mock).mockResolvedValueOnce([]);
-      (mockMessage.count as jest.Mock).mockResolvedValueOnce(0);
+      mockMessage.findMany.mockResolvedValueOnce([]);
+      mockMessage.count.mockResolvedValueOnce(0);
 
       await request(app).get('/v2/messages?authorId=5');
 
       expect(mockMessage.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({ authorId: 5 }),
-        }),
+        })
       );
     });
 
     it('clamps limit to max 100', async () => {
-      (mockMessage.findMany as jest.Mock).mockResolvedValueOnce([]);
-      (mockMessage.count as jest.Mock).mockResolvedValueOnce(0);
+      mockMessage.findMany.mockResolvedValueOnce([]);
+      mockMessage.count.mockResolvedValueOnce(0);
 
       const response = await request(app).get('/v2/messages?limit=999');
 
@@ -91,7 +92,7 @@ describe('v2 Messages Routes', () => {
 
   describe('GET /v2/messages/:id', () => {
     it('returns a message by id (public)', async () => {
-      (mockMessage.findUnique as jest.Mock).mockResolvedValueOnce({
+      mockMessage.findUnique.mockResolvedValueOnce({
         id: 1,
         content: 'Hello',
         author: { id: 1, username: 'jchen' },
@@ -104,7 +105,7 @@ describe('v2 Messages Routes', () => {
     });
 
     it('returns 404 for non-existent message', async () => {
-      (mockMessage.findUnique as jest.Mock).mockResolvedValueOnce(null);
+      mockMessage.findUnique.mockResolvedValueOnce(null);
 
       const response = await request(app).get('/v2/messages/999');
 
@@ -120,7 +121,7 @@ describe('v2 Messages Routes', () => {
 
   describe('POST /v2/messages', () => {
     it('creates a message for the authenticated user', async () => {
-      (mockMessage.create as jest.Mock).mockResolvedValueOnce({
+      mockMessage.create.mockResolvedValueOnce({
         id: 1,
         content: 'New message',
         authorId: 1,
@@ -137,7 +138,7 @@ describe('v2 Messages Routes', () => {
       expect(mockMessage.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ authorId: 1 }),
-        }),
+        })
       );
     });
 
@@ -156,8 +157,8 @@ describe('v2 Messages Routes', () => {
 
   describe('PUT /v2/messages/:id', () => {
     it('owner can update', async () => {
-      (mockMessage.findUnique as jest.Mock).mockResolvedValueOnce({ authorId: 1 });
-      (mockMessage.update as jest.Mock).mockResolvedValueOnce({
+      mockMessage.findUnique.mockResolvedValueOnce({ authorId: 1 });
+      mockMessage.update.mockResolvedValueOnce({
         id: 1,
         content: 'Updated',
         author: { id: 1, username: 'jchen' },
@@ -172,7 +173,7 @@ describe('v2 Messages Routes', () => {
     });
 
     it('non-owner gets 403', async () => {
-      (mockMessage.findUnique as jest.Mock).mockResolvedValueOnce({ authorId: 1 });
+      mockMessage.findUnique.mockResolvedValueOnce({ authorId: 1 });
 
       const response = await request(app)
         .put('/v2/messages/1')
@@ -183,7 +184,7 @@ describe('v2 Messages Routes', () => {
     });
 
     it('returns 404 for non-existent message', async () => {
-      (mockMessage.findUnique as jest.Mock).mockResolvedValueOnce(null);
+      mockMessage.findUnique.mockResolvedValueOnce(null);
 
       const response = await request(app)
         .put('/v2/messages/999')
@@ -202,24 +203,21 @@ describe('v2 Messages Routes', () => {
 
   describe('PATCH /v2/messages/:id', () => {
     it('owner can partially update', async () => {
-      (mockMessage.findUnique as jest.Mock).mockResolvedValueOnce({ authorId: 1 });
-      (mockMessage.update as jest.Mock).mockResolvedValueOnce({
+      mockMessage.findUnique.mockResolvedValueOnce({ authorId: 1 });
+      mockMessage.update.mockResolvedValueOnce({
         id: 1,
         content: 'Hello',
         read: true,
         author: { id: 1, username: 'jchen' },
       });
 
-      const response = await request(app)
-        .patch('/v2/messages/1')
-        .set(asUser)
-        .send({ read: true });
+      const response = await request(app).patch('/v2/messages/1').set(asUser).send({ read: true });
 
       expect(response.status).toBe(200);
     });
 
     it('non-owner gets 403', async () => {
-      (mockMessage.findUnique as jest.Mock).mockResolvedValueOnce({ authorId: 1 });
+      mockMessage.findUnique.mockResolvedValueOnce({ authorId: 1 });
 
       const response = await request(app)
         .patch('/v2/messages/1')
@@ -241,8 +239,8 @@ describe('v2 Messages Routes', () => {
 
   describe('DELETE /v2/messages/:id', () => {
     it('owner can delete own message', async () => {
-      (mockMessage.findUnique as jest.Mock).mockResolvedValueOnce({ authorId: 1 });
-      (mockMessage.delete as jest.Mock).mockResolvedValueOnce({ id: 1 });
+      mockMessage.findUnique.mockResolvedValueOnce({ authorId: 1 });
+      mockMessage.delete.mockResolvedValueOnce({ id: 1 });
 
       const response = await request(app).delete('/v2/messages/1').set(asUser);
 
@@ -250,7 +248,7 @@ describe('v2 Messages Routes', () => {
     });
 
     it('non-owner non-admin gets 403', async () => {
-      (mockMessage.findUnique as jest.Mock).mockResolvedValueOnce({ authorId: 1 });
+      mockMessage.findUnique.mockResolvedValueOnce({ authorId: 1 });
 
       const response = await request(app).delete('/v2/messages/1').set(asOtherUser);
 
@@ -258,8 +256,8 @@ describe('v2 Messages Routes', () => {
     });
 
     it('admin can delete any message', async () => {
-      (mockMessage.findUnique as jest.Mock).mockResolvedValueOnce({ authorId: 1 });
-      (mockMessage.delete as jest.Mock).mockResolvedValueOnce({ id: 1 });
+      mockMessage.findUnique.mockResolvedValueOnce({ authorId: 1 });
+      mockMessage.delete.mockResolvedValueOnce({ id: 1 });
 
       const response = await request(app).delete('/v2/messages/1').set(asAdmin);
 
@@ -267,7 +265,7 @@ describe('v2 Messages Routes', () => {
     });
 
     it('returns 404 for non-existent message', async () => {
-      (mockMessage.findUnique as jest.Mock).mockResolvedValueOnce(null);
+      mockMessage.findUnique.mockResolvedValueOnce(null);
 
       const response = await request(app).delete('/v2/messages/999').set(asUser);
 

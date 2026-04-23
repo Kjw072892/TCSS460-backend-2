@@ -37,13 +37,13 @@ Exit code is non-zero if any assertion fails — useful for CI.
 
 ## What it covers
 
-| Folder | What it proves |
-|---|---|
-| 0 — Setup | `/auth/dev-login` mints tokens; JWT `role` claim is correct for user vs. admin; missing username → 400 |
-| 1 — Public GETs | List and single-resource GETs don't require auth; bad id → 400 |
+| Folder          | What it proves                                                                                                                                                                          |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 — Setup       | `/auth/dev-login` mints tokens; JWT `role` claim is correct for user vs. admin; missing username → 400                                                                                  |
+| 1 — Public GETs | List and single-resource GETs don't require auth; bad id → 400                                                                                                                          |
 | 2 — Messages v2 | POST without token → 401; bad token → 401; authed POST → 201 with `authorId` = JWT `sub`; owner PATCH → 200; non-owner PATCH/DELETE → 403; admin DELETE override → 200; re-delete → 404 |
-| 3 — Messages v1 | Same flow against the raw-SQL path |
-| 4 — Users | Public list and `POST /v1/users` (idempotent across runs via a timestamp suffix) |
+| 3 — Messages v1 | Same flow against the raw-SQL path                                                                                                                                                      |
+| 4 — Users       | Public list and `POST /v1/users` (idempotent across runs via a timestamp suffix)                                                                                                        |
 
 ## Resetting between runs
 

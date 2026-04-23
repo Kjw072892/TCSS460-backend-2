@@ -2,11 +2,15 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import fs from 'fs';
 import YAML from 'yaml';
-import { apiReference } from '@scalar/express-api-reference';
+import type { RequestHandler } from 'express';
 import { routes } from '@/routes';
 import { logger } from '@/middleware/logger';
 
 const app = express();
+const importEsm = new Function('specifier', 'return import(specifier);') as (
+  specifier: string
+) => Promise<{ apiReference: (config: { url: string }) => RequestHandler }>;
+let apiDocsHandler: RequestHandler | undefined;
 
 // Application-level middleware
 app.use(cors());
@@ -19,7 +23,19 @@ const spec = YAML.parse(specFile);
 app.get('/openapi.json', (_request: Request, response: Response) => {
   response.json(spec);
 });
-app.use('/api-docs', apiReference({ spec: { url: '/openapi.json' } }));
+app.use('/api-docs', async (request, response, next) => {
+  try {
+    if (!apiDocsHandler) {
+      const { apiReference } = await importEsm('@scalar/express-api-reference');
+      apiDocsHandler = apiReference({ url: '/openapi.json' });
+    }
+
+    const handler = apiDocsHandler;
+    handler(request, response, next);
+  } catch (error) {
+    next(error);
+  }
+});
 
 // Routes
 app.use(routes);
