@@ -19,6 +19,7 @@ model User {
     updatedAt DateTime  @updatedAt @map("updated_at")
     messages  Message[]
     sayings   Saying[]
+    taxStatus taxExemptStatus[]
 
     @@map("users")
 }
@@ -36,6 +37,7 @@ model Message {
     @@map("messages")
 }
 
+// My New Schema model
 model Saying {
     id       Int    @id @default(autoincrement())
     content  String
@@ -43,4 +45,23 @@ model Saying {
     author   User   @relation(fields: [authorId], references: [id])
 
     @@map("sayings")
+}
+
+// Be sure to update the database with the new model first before building CRUD functions
+// Run docker first to get your database up and running. 
+
+// npx prisma dev --name tax-exempt-status -> adds the model to the database
+// npx prisma generate -> automatically generates all of the functions to build CRUD 
+model taxExemptStatus {
+    id Int @id @default(autoincrement())
+    tax_id Int @unique
+    userId Int @map("user_id")
+    user User @relation(fields:[userId], references: [id])
+    year Int
+    exempt Boolean
+    createdAt DateTime @default(now()) @map("created_at")
+    updatedAt DateTime @updatedAt @map("updated_at")
+
+    @@unique([userId, year])
+    @@map("tax_exempt_statuses")
 }
