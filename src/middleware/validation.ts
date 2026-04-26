@@ -42,6 +42,14 @@ const SayingBodySchema = z.object({
   content: z.string().trim().min(1),
 });
 
+const PatchSayingBodySchema = z
+  .object({
+    content: z.string().trim().min(1).optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, {
+    message: 'At least one field is required (content)',
+  });
+
 /**
  * Generic middleware factory. Parses `request[source]` against `schema`;
  * on failure responds 400 with issue details, on success replaces the
@@ -73,6 +81,7 @@ export const validateMessageBody = validate('body', MessageBodySchema);
 export const validatePatchMessageBody = validate('body', PatchMessageBodySchema);
 export const validateUserBody = validate('body', UserBodySchema);
 export const validateSayingBody = validate('body', SayingBodySchema);
+export const validatePatchSayingBody = validate('body', PatchSayingBodySchema);
 
 // --- Types inferred from schemas (no hand-written interfaces needed) ---
 
@@ -80,3 +89,4 @@ export type MessageBody = z.infer<typeof MessageBodySchema>;
 export type PatchMessageBody = z.infer<typeof PatchMessageBodySchema>;
 export type UserBody = z.infer<typeof UserBodySchema>;
 export type SayingBody = z.infer<typeof SayingBodySchema>;
+export type PatchSayingBody = z.infer<typeof PatchSayingBodySchema>;

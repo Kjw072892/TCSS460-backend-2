@@ -40,11 +40,13 @@ router.post('/dev-login', async (request: Request, response: Response): Promise<
   });
 
   const token = jwt.sign(
+  //The body
     {
       sub: user.id,
       email: user.email,
       role: user.role,
     },
+    //The secret key
     secret,
     { expiresIn: '24h' }
   );

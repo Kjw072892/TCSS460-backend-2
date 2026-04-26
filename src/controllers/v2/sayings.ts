@@ -1,7 +1,7 @@
-//  create, update, delete
+//  delete
 import { request as _request, Request, Response } from 'express';
 import { prisma } from '@/prisma';
-import { Prisma as _Prisma } from '@/generated/prisma/client';
+import { Prisma } from '@/generated/prisma/client';
 
 const ALLOWED_SORT_FIELDS = ['id', 'content'];
 const DEFAULT_LIMIT = 25;
@@ -36,7 +36,14 @@ export const getContents = async (request: Request, response: Response) => {
         skip,
         take: limit,
         orderBy: { [sort]: order },
-        include: { content: { select: { id: true } } },
+        select: {
+          id: true, content: true, authorId: true, author: {
+            select: {
+              firstName: true,
+              lastName: true,
+            }
+          }
+        },
       }),
       prisma.saying.count({ where }),
     ]);
@@ -48,6 +55,147 @@ export const getContents = async (request: Request, response: Response) => {
       pagination: { page, limit, total, totalPages },
     });
   } catch (_error) {
-    response.status(500).json({ error: 'Failed to retrieve messages' });
+    response.status(500).json({ error: 'Failed to retrieve sayings' });
   }
 };
+
+export const getSayingById = async (request: Request, response: Response) => {
+  const id = Number(request.params.id);
+
+  try {
+    const saying = await prisma.saying.findUnique({
+      where: { id },
+      include: { author: { select: { id: true, username: true } } },
+    });
+
+    if (!saying) {
+      response.status(404).json({ error: 'Saying not found' });
+      return;
+    }
+
+    response.json({ data: saying });
+  } catch (_error) {
+    response.status(500).json({ error: 'Failed to retrieve saying' });
+  }
+};
+
+// Create
+export const createSaying = async (request: Request, response: Response) => {
+  const { content } = request.body;
+  const authorId = request.user!.sub;
+
+  try {
+    const saying = await prisma.saying.create({
+      data: { content, authorId },
+      include: { author: { select: { id: true, username: true } } },
+
+    });
+    response.status(201).json({ data: saying });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2003') {
+        response.status(400).json({ error: 'Author not found' });
+        return;
+      }
+    }
+    response.status(500).json({ error: 'Failed to create saying' });
+  }
+};
+
+
+// Update
+export const updateSaying = async (request: Request, response: Response) => {
+  const id = Number(request.params.id);
+  const { content } = request.body;
+  const { sub: authorId } = request.user!;
+
+  try {
+    const existing = await prisma.saying.findUnique({
+      where: { id },
+      select: { authorId: true },
+    });
+    if (!existing) {
+      response.status(404).json({ error: 'Saying not found' });
+      return;
+    }
+    if (existing.authorId !== authorId) {
+      response.status(403).json({ error: 'You can only update your own saying' });
+      return;
+    }
+
+    const saying = await prisma.saying.update({
+      where: { id },
+      data: { content },
+      include: { author: { select: { id: true, username: true } } },
+    });
+
+    response.json({ data: saying });
+  } catch (_error) {
+    response.status(500).json({ error: 'Failed to update saying' });
+  }
+};
+
+// Patch
+export const patchSaying = async (request: Request, response: Response) => {
+  const id = Number(request.params.id);
+  const { content } = request.body;
+  const authorId = request.user!.sub;
+
+  try {
+    const existing = await prisma.saying.findUnique({
+      where: { id },
+      select: { authorId: true },
+    });
+    if (!existing) {
+      response.status(404).json({ error: 'Saying not found' });
+      return;
+    }
+
+    if (existing.authorId !== authorId) {
+      response.status(403).json({ error: 'You can only update your own saying' });
+      return;
+    }
+    const data: Record<string, unknown> = {};
+    if (content !== undefined) data.content = content;
+
+    const saying = await prisma.saying.update({
+      where: { id },
+      data,
+      include: { author: { select: { id: true, username: true } } },
+    });
+
+    response.json({ data: saying });
+  } catch (_error) {
+    response.status(500).json({ error: 'Failed to update saying' });
+  }
+};
+
+// delete
+export const deleteSaying = async (request: Request, response: Response) => {
+  const id = Number(request.params.id);
+  const { sub: authorId, role } = request.user!;
+
+  try {
+    const existing = await prisma.saying.findUnique({
+      where: { id },
+      select: { authorId: true },
+    });
+
+    if (!existing) {
+      response.status(404).json({ error: 'Saying not found' });
+      return;
+    }
+    if (role !== 'admin' && existing.authorId !== authorId) {
+      response.status(403).json({ error: 'You can only delete your own saying' });
+      return;
+    }
+
+    await prisma.saying.delete({ where: { id } });
+
+    response.json({ data: { message: 'Saying deleted successfully' } })
+
+  } catch (_error) {
+    response.status(500).json({ error: 'Failed to delete saying' });
+  }
+
+}

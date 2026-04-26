@@ -26,10 +26,10 @@ export const getMessages = async (request: Request, response: Response) => {
   try {
     const [messages, total] = await Promise.all([
       prisma.message.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { [sort]: order },
+        where, // look to see where we have our authorId
+        skip, // our pagination 
+        take: limit, // more pagination
+        orderBy: { [sort]: order }, // ordering the data
         include: { author: { select: { id: true, username: true } } },
       }),
       prisma.message.count({ where }),

@@ -132,6 +132,19 @@ const SUBJECTS = [
   null,
 ];
 
+const SAYINGS = [
+  'The early bird catches the worm',
+  'Stab him in the butt',
+  'Welcome to the circus',
+  'My name is fred',
+  'Hello world',
+  'Work hard play hard',
+  'A journey of a thousand miles begins with a single step',
+  'Work it before you twerk it',
+  'Love to hate it',
+  'suck to suck sucker',
+];
+
 function randomItem<T>(array: T[]): T {
   return array[Math.floor(Math.random() * array.length)];
 }
@@ -142,6 +155,7 @@ async function main() {
 
   // Clear existing data
   await prisma.message.deleteMany();
+  await prisma.saying.deleteMany();
   await prisma.user.deleteMany();
 
   // Create users
@@ -166,6 +180,18 @@ async function main() {
 
   // eslint-disable-next-line no-console
   console.log(`Created ${messageResult.count} messages`);
+  
+  await prisma.saying.deleteMany();
+
+  await prisma.saying.createMany({
+    data: SAYINGS.map((content, index) => ({
+      content,
+      authorId: createdUsers[index].id,
+    })),
+  });
+
+  // eslint-disable-next-line no-console
+  console.log(`Created ${Math.min(SAYINGS.length, createdUsers.length)} sayings`);
 
   // eslint-disable-next-line no-console
   console.log('Seeding complete!');
